@@ -1,0 +1,22 @@
+{
+  "name": "claude-bridge",
+  "displayName": "Claude Bridge",
+  "description": "Lets Claude (via the Aseprite MCP connector) create and edit pixel art in the open Aseprite window.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Zachary Reggio",
+    "url": "https://github.com/zreggio/claude-aseprite-connector"
+  },
+  "publisher": "zreggio",
+  "license": "MIT",
+  "categories": [
+    "Scripts"
+  ],
+  "contributes": {
+    "scripts": [
+      {
+        "path": "./main.lua"
+      }
+    ]
+  }
+}
