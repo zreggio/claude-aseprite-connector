@@ -67,7 +67,11 @@ If the extension wasn't installed automatically, use either method:
 
 ### 3. Connect Claude
 
-**Claude Code (CLI or desktop Code tab).** Register the server for all your projects. Use the absolute path that `npm run setup` printed:
+Claude Code and Claude Desktop's chat keep **separate** connector lists. Set up whichever ones you use; registering one does not make the connector available in the other.
+
+#### Claude Code (CLI or the desktop app's Code tab)
+
+Register the server for all your projects. Use the absolute path that `npm run setup` printed:
 
 ```bash
 claude mcp add --scope user aseprite -- node /absolute/path/to/claude-aseprite-connector/dist/index.js
@@ -81,11 +85,37 @@ Without the CLI, add this under `"mcpServers"` in `~/.claude.json`:
 ```
 Then start a **new** Claude Code session.
 
-**Claude Desktop (chat).** Double-click `dist/aseprite.mcpb`, and Claude Desktop opens its install dialog. That dialog lets you set:
-- the Aseprite path (auto-detected when left empty)
-- the working folder
-- the bridge port
-- whether to allow `run_lua`
+#### Claude Desktop (chat)
+
+The connector installs into Claude Desktop as a desktop extension: `dist/aseprite.mcpb`, created by `npm run setup`. Claude Desktop ships with its own Node.js runtime, so the extension runs even on a computer without Node installed. You only need Node to build the file.
+
+1. **Open the extensions page.**
+   - In Claude Desktop, open **Settings › Desktop app** and click **Manage** next to **Extensions**.
+   - In older versions, it's **Settings › Extensions**.
+2. **Install the file.**
+   1. Click **Advanced settings**.
+   2. In the **Extension Developer** section, click **Install Extension…**.
+   3. Select `dist/aseprite.mcpb` inside your clone, e.g. `C:\Users\<you>\claude-aseprite-connector\dist\aseprite.mcpb` or `~/claude-aseprite-connector/dist/aseprite.mcpb`.
+3. **Review the settings** in the install dialog. The defaults are fine for most people:
+
+   | Setting | Default | Change it when… |
+   |---|---|---|
+   | Aseprite executable | empty (auto-detect) | Aseprite isn't in a standard or Steam location; pick `Aseprite.exe` (or the app binary on macOS/Linux) |
+   | Working folder | `Documents/Aseprite Claude` | You want new sprites and exports saved somewhere else |
+   | Bridge port | `47823` | Something else uses that port; it must match Aseprite's **File › Claude Bridge › Status…** |
+   | Allow run_lua | off | You want Claude to be able to run arbitrary Lua inside Aseprite |
+
+   Click **Install**.
+4. **Restart Claude Desktop completely.** Quit it from the system tray (Windows) or menu bar (macOS), not just by closing the window, then reopen it.
+5. **Start a new chat.** Chats that were already open don't pick up newly installed extensions.
+6. **Check it's connected.** Click the **+** button at the bottom of the chat box, then **Connectors**. **Aseprite** should be listed with its tools.
+
+To change settings later, go to **Settings › Desktop app › Manage** (next to Extensions) and click **Aseprite**.
+To update after a `git pull`, run `npm run setup` again and reinstall the new `dist/aseprite.mcpb` the same way.
+
+Prefer not to build? Every CI run on GitHub (**Actions** tab › latest run › **Artifacts** › `packages`) includes a ready-made `aseprite.mcpb` and `claude-bridge.aseprite-extension`.
+
+> **One app at a time.** Only one Claude app can drive Aseprite live at a time. If a Claude Code session already has the connector running, the Desktop chat falls back to headless mode (editing files on disk), and its `status` tool explains why. Close the other session to draw live from the chat.
 
 ### 4. Verify
 
@@ -245,6 +275,11 @@ Mutating commands run inside `app.transaction`, so a failed command rolls back e
 - **`status` says headless while Aseprite is open.**
   - Open **File › Claude Bridge › Status…** in Aseprite and check that the port matches.
   - Only one Claude app can own the port at a time. A second one (e.g. Claude Desktop while Claude Code is running) falls back to headless, and `status` explains why.
+- **A Claude Desktop chat says it has no Aseprite tools.**
+  - Check **Settings › Desktop app › Manage** (next to Extensions). If **Aseprite** isn't listed, the `.mcpb` was never installed; follow the [Claude Desktop steps](#claude-desktop-chat).
+  - Fully quit and reopen Claude Desktop, then start a **new** chat.
+  - Registering the server for Claude Code does not install it in Claude Desktop.
+- **The Aseprite extension is installed in Claude Desktop but fails to start.** Its status and logs are in the **Local MCP servers** section of the Extensions page (older versions: **Settings › Developer**). Turning on debug logging in Claude Desktop's settings adds more detail.
 - **The File › Claude Bridge menu is missing.**
   - Check that the extension is listed and enabled in **Edit › Preferences › Extensions**.
   - Restart Aseprite after installing.

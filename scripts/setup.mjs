@@ -75,7 +75,11 @@ if (args.has("--claude-code") && hasClaudeCli) {
   console.log(`    "aseprite": { "type": "stdio", "command": "${nodeCmd}", "args": ["${entry}"] }`);
 }
 
-console.log("\n  Claude Desktop (chat):");
-console.log(`    Double-click ${fwd(path.join(root, "dist", "aseprite.mcpb"))} (Claude Desktop opens an install dialog)`);
+console.log("\n  Claude Desktop (chat) — separate from Claude Code:");
+console.log("    1. Settings > Desktop app > Manage (next to Extensions)   [older versions: Settings > Extensions]");
+console.log("    2. Advanced settings > Extension Developer > Install Extension...");
+console.log(`    3. Select ${fwd(path.join(root, "dist", "aseprite.mcpb"))} and click Install`);
+console.log("    4. Fully quit Claude Desktop (tray / menu bar), reopen it, and start a NEW chat");
+console.log("    5. Check: + button in the chat box > Connectors > Aseprite");
 
 console.log("\nThen open Aseprite and ask Claude: \"Call the aseprite status tool\" — it should report mode \"live\".\n");
