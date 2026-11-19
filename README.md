@@ -287,6 +287,12 @@ Mutating commands run inside `app.transaction`, so a failed command rolls back e
 - **"Aseprite executable was not found".** Set `ASEPRITE_PATH`, or open Aseprite with the extension so live mode is used.
 - **Selections in headless mode.** Aseprite doesn't save selections in `.aseprite` files, so headless mode keeps them in a sprite property between calls.
 
+## Upcoming features
+
+- **Stylization commands.** Tools that apply a pixel-art style to a sprite in one step.
+- **One connector for Claude Desktop and Claude Code.** A single install that works in both apps, instead of setting each one up separately.
+- **Auto-update the open Aseprite file.** Changes Claude makes to a file update automatically in the Aseprite window that has it open.
+
 ## License
 
 [MIT](LICENSE)
