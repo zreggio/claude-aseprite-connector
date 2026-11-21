@@ -1,13 +1,10 @@
 {
   "name": "claude-aseprite-connector",
   "version": "1.0.0",
-  "description": "Claude connector (MCP server + Aseprite extension) for creating 2D pixel art in Aseprite",
+  "description": "Claude Code connector (MCP server) for creating 2D pixel art in Aseprite",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:extension": "node scripts/build-extension.mjs",
-    "build:mcpb": "node scripts/build-mcpb.mjs",
-    "package": "npm run build && npm run build:extension && npm run build:mcpb",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:headless": "vitest run tests/headless",
@@ -15,22 +12,18 @@
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
     "pretest": "npm run build",
     "pretest:headless": "npm run build",
-    "install:extension": "node scripts/install-extension.mjs",
-    "setup": "npm run package && node scripts/setup.mjs"
+    "setup": "npm run build && node scripts/setup.mjs"
   },
   "license": "MIT",
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "pngjs": "^7.0.0",
-    "ws": "^8.23.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@anthropic-ai/mcpb": "^2.1.2",
     "@types/node": "^26.6.6",
     "@types/pngjs": "^6.0.5",
-    "@types/ws": "^8.18.2",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"

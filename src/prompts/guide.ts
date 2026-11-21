@@ -1,11 +1,12 @@
 export const SERVER_INSTRUCTIONS = `Aseprite connector: create and edit static 2D pixel-art assets in Aseprite (single frame; no animation).
 
 How it works
-- Call \`status\` first. mode "live" = you are editing the user's open Aseprite window (each tool call is one Ctrl+Z step). mode "headless" = edits are applied to an .aseprite file on disk.
+- Call \`status\` first, then \`new_sprite\` or \`open_sprite\`. Each edit runs in a background Aseprite process and is saved to that .aseprite file on disk. There is no undo, so save a copy (\`save_sprite\` with a new path) before risky changes.
+- When the user asks to see a file in Aseprite ("show me this in Aseprite"), call \`show_in_aseprite\`. It opens the file in their Aseprite window.
 - Coordinates are sprite pixels, origin top-left. Colors are '#rrggbb', '#rrggbbaa', 'transparent' or a palette index.
 - \`draw_pixel_map\` is the main drawing tool (text rows + legend). \`read_pixels\` returns the same format, so you can read, edit and write back.
 - Look at your work often with \`render_preview\`; check it with \`analyze\` before finishing.
-- Use \`batch\` to apply many edits in one round trip and one undo step.
+- Use \`batch\` to apply many edits in one round trip; if any op fails, none of them are applied.
 - Work in layers (e.g. Outline / Base / Shading / Highlights) and keep a small fixed palette.
 - Read the resource aseprite://guide/pixel-art (or use the pixel_art_asset prompt) for the full asset workflow.`;
 

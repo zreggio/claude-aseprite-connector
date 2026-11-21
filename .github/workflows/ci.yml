@@ -30,12 +30,3 @@ jobs:
       - run: npm run build
       # Headless tests need a real Aseprite install, so CI runs unit tests only.
       - run: npm run test:unit
-      - run: npm run build:extension
-      - run: npm run build:mcpb
-      - uses: actions/upload-artifact@v7
-        if: matrix.os == 'ubuntu-latest'
-        with:
-          name: packages
-          path: |
-            dist/aseprite.mcpb
-            dist/claude-bridge.aseprite-extension

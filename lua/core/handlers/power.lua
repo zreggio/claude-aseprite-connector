@@ -1,6 +1,6 @@
 -- batch (many ops, one round trip, one undo step) and run_lua (opt-in).
 return function(def, U, json, D)
-  local NOT_BATCHABLE = { batch = true, undo = true, redo = true, new_sprite = true, open_sprite = true, status = true }
+  local NOT_BATCHABLE = { batch = true, new_sprite = true, open_sprite = true, status = true }
 
   def("batch", { mutates = true, label = "batch" }, function(p, ctx)
     local ops = p.ops

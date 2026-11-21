@@ -1,6 +1,8 @@
-# Aseprite Connector for Claude
+# Aseprite Connector for Claude Code
 
-Let Claude create and edit **2D pixel-art assets** (sprites, icons, items and tiles) in [Aseprite](https://www.aseprite.org/), either live in the open Aseprite window or in the background on `.aseprite` files.
+Let [Claude Code](https://claude.com/claude-code) create and edit **2D pixel-art assets** (sprites, icons, items and tiles) as [Aseprite](https://www.aseprite.org/) files.
+
+**Built for Claude Code**: the CLI, the desktop app's Code tab, or the IDE extensions. The connector is not packaged for Claude Desktop's chat.
 
 <p align="center">
   <img src="docs/images/chest.png" width="192" alt="32x32 treasure chest">
@@ -13,18 +15,18 @@ Let Claude create and edit **2D pixel-art assets** (sprites, icons, items and ti
 
 ## How it works
 
-| Part | What it is |
-|---|---|
-| **MCP server** (`aseprite`) | A Node.js server that gives Claude ~40 tools for drawing, layers, palettes, previews and export. |
-| **Claude Bridge** extension | An Aseprite extension that connects to the server so Claude can edit the **open Aseprite window live**. |
+The connector is an **MCP server** (`aseprite`): a Node.js server that gives Claude ~40 tools for drawing, layers, palettes, previews and export. Nothing needs to be installed inside Aseprite.
 
 ```
-Claude ──MCP──▶ aseprite-mcp ──┬─ live:     WebSocket 127.0.0.1:47823 ◀── Claude Bridge (inside Aseprite)
-                               └─ headless: Aseprite -b --script lua/headless.lua   (edits .aseprite files)
+Claude Code ──MCP──▶ aseprite-mcp ──▶ Aseprite -b --script lua/headless.lua   (edits .aseprite files)
 ```
 
-- **Live mode.** Aseprite is open with the extension connected. You watch Claude draw, and every tool call is a single **Ctrl+Z** step.
-- **Headless mode.** The automatic fallback when Aseprite isn't open. Claude edits `.aseprite` files on disk by running Aseprite in batch mode.
+- For every tool call, the server runs Aseprite in the background (batch mode, no window) on the current `.aseprite` file and saves the result.
+- Claude sees its work through `render_preview`, which returns an image of the sprite.
+- To see the result in Aseprite, ask Claude to **"show me this in Aseprite"**. It opens the file as a new tab in your Aseprite window, or starts Aseprite if it isn't running (see [`show_in_aseprite`](#show_in_aseprite)).
+- If the file is already open in Aseprite, close its tab first: Aseprite doesn't reload files changed on disk.
+
+> **Don't edit the same file in two places.** If you save a file in Aseprite while Claude is working on it, your save overwrites Claude's changes (and the other way round).
 
 ---
 
@@ -37,9 +39,7 @@ Claude ──MCP──▶ aseprite-mcp ──┬─ live:     WebSocket 127.0.0.
 | **Aseprite 1.3 or newer** | Any edition: Steam, itch.io, aseprite.org, or self-compiled. Tested on 1.3.18. |
 | **Node.js 20 or newer** | [nodejs.org](https://nodejs.org/). Check with `node --version`. |
 | **Git** | To clone the repository. |
-| **Claude** | Claude Code (CLI or the desktop app's Code tab) and/or Claude Desktop (chat). |
-
-**Launch Aseprite once** before setup, then close it. That creates its settings folder, which the extension installer needs.
+| **Claude Code** | The CLI, the desktop app's Code tab, or an IDE extension. |
 
 ### 2. Clone and build
 
@@ -50,26 +50,12 @@ npm install
 npm run setup
 ```
 
-`npm run setup` does four things:
-1. Builds the server and both packages:
-   - `dist/index.js`: the MCP server
-   - `dist/claude-bridge.aseprite-extension`: the Aseprite extension
-   - `dist/aseprite.mcpb`: a one-click bundle for Claude Desktop
-2. Finds your Aseprite install.
-3. Installs the Claude Bridge extension into Aseprite.
-4. Prints the exact commands to connect Claude on this machine.
+`npm run setup` does three things:
+1. Builds the MCP server into `dist/index.js`.
+2. Finds your Aseprite install. If it can't, set `ASEPRITE_PATH` (see [Configuration](#configuration)).
+3. Prints the exact command to connect Claude Code on this machine.
 
-If the extension wasn't installed automatically, use either method:
-- Double-click `dist/claude-bridge.aseprite-extension`.
-- In Aseprite, go to **Edit › Preferences › Extensions › Add Extension** and pick that file.
-
-**Restart Aseprite.** A **File › Claude Bridge** menu should appear, and the extension connects automatically.
-
-### 3. Connect Claude
-
-Claude Code and Claude Desktop's chat keep **separate** connector lists. Set up whichever ones you use; registering one does not make the connector available in the other.
-
-#### Claude Code (CLI or the desktop app's Code tab)
+### 3. Connect Claude Code
 
 Register the server for all your projects. Use the absolute path that `npm run setup` printed:
 
@@ -85,53 +71,15 @@ Without the CLI, add this under `"mcpServers"` in `~/.claude.json`:
 ```
 Then start a **new** Claude Code session.
 
-#### Claude Desktop (chat)
-
-The connector installs into Claude Desktop as a desktop extension: `dist/aseprite.mcpb`, created by `npm run setup`. Claude Desktop ships with its own Node.js runtime, so the extension runs even on a computer without Node installed. You only need Node to build the file.
-
-1. **Open the extensions page.**
-   - In Claude Desktop, open **Settings › Desktop app** and click **Manage** next to **Extensions**.
-   - In older versions, it's **Settings › Extensions**.
-2. **Install the file.**
-   1. Click **Advanced settings**.
-   2. In the **Extension Developer** section, click **Install Extension…**.
-   3. Select `dist/aseprite.mcpb` inside your clone, e.g. `C:\Users\<you>\claude-aseprite-connector\dist\aseprite.mcpb` or `~/claude-aseprite-connector/dist/aseprite.mcpb`.
-3. **Review the settings** in the install dialog. The defaults are fine for most people:
-
-   | Setting | Default | Change it when… |
-   |---|---|---|
-   | Aseprite executable | empty (auto-detect) | Aseprite isn't in a standard or Steam location; pick `Aseprite.exe` (or the app binary on macOS/Linux) |
-   | Working folder | `Documents/Aseprite Claude` | You want new sprites and exports saved somewhere else |
-   | Bridge port | `47823` | Something else uses that port; it must match Aseprite's **File › Claude Bridge › Status…** |
-   | Allow run_lua | off | You want Claude to be able to run arbitrary Lua inside Aseprite |
-
-   Click **Install**.
-4. **Restart Claude Desktop completely.** Quit it from the system tray (Windows) or menu bar (macOS), not just by closing the window, then reopen it.
-5. **Start a new chat.** Chats that were already open don't pick up newly installed extensions.
-6. **Check it's connected.** Click the **+** button at the bottom of the chat box, then **Connectors**. **Aseprite** should be listed with its tools.
-
-To change settings later, go to **Settings › Desktop app › Manage** (next to Extensions) and click **Aseprite**.
-To update after a `git pull`, run `npm run setup` again and reinstall the new `dist/aseprite.mcpb` the same way.
-
-Prefer not to build? Every CI run on GitHub (**Actions** tab › latest run › **Artifacts** › `packages`) includes a ready-made `aseprite.mcpb` and `claude-bridge.aseprite-extension`.
-
-> **One app at a time.** Only one Claude app can drive Aseprite live at a time. If a Claude Code session already has the connector running, the Desktop chat falls back to headless mode (editing files on disk), and its `status` tool explains why. Close the other session to draw live from the chat.
-
 ### 4. Verify
 
-1. Open Aseprite. In Aseprite, **File › Claude Bridge › Status…** shows `connected` once Claude is running.
-2. Ask Claude: *"Call the aseprite status tool."* It should report `"mode": "live"`.
-3. Ask: *"Make a 32×32 pixel-art sword icon using the PICO-8 palette."*
-
-**First save prompt.** The first time Claude saves or exports a file, Aseprite's Security dialog asks whether the *Claude Bridge* script may write it. To stop being asked:
-1. Tick **Give full trust to this script**.
-2. Click **Allow Write Access**.
-
-Only `core/handlers/document.lua` writes files: `new_sprite` with a path, `save_sprite` and `export_image`.
+1. Ask Claude: *"Call the aseprite status tool."* It should report `"aseprite_found": true`.
+2. Ask: *"Make a 32×32 pixel-art sword icon using the PICO-8 palette."*
+3. Ask: *"Show me this in Aseprite."* The sprite should open in Aseprite.
 
 ### Updating
 
-New features and fixes are added to the `main` branch on GitHub. To get them, pull the changes into your clone, rebuild, then refresh each part that uses the connector.
+New features and fixes are added to the `main` branch on GitHub. To get them, pull the changes into your clone, rebuild, then start a new Claude Code session.
 
 #### 1. Check for updates
 
@@ -146,8 +94,6 @@ If nothing is listed, you're up to date. Otherwise, each line is a change you do
 
 #### 2. Pull and rebuild
 
-Close Aseprite first, so the extension files aren't in use. Then run:
-
 ```bash
 git pull
 npm install
@@ -156,28 +102,31 @@ npm run setup
 
 - `git pull` downloads the latest code.
 - `npm install` picks up any new or updated dependencies.
-- `npm run setup` rebuilds the server, `dist/claude-bridge.aseprite-extension` and `dist/aseprite.mcpb`, and reinstalls the extension into Aseprite.
+- `npm run setup` rebuilds the server.
 
 **If `git pull` refuses** because you have local changes, either set them aside with `git stash` (bring them back later with `git stash pop`) or discard them with `git checkout -- .`. Then run `git pull` again.
 
 #### 3. Apply the update
 
-Update each part you use:
-
-| Part | What to do |
-|---|---|
-| **Aseprite extension** | Reopen Aseprite. `npm run setup` already reinstalled it. If it says the extension wasn't installed, double-click `dist/claude-bridge.aseprite-extension`. |
-| **Claude Code** | Start a **new** session. No need to re-register, since the server path hasn't changed. |
-| **Claude Desktop (chat)** | Reinstall `dist/aseprite.mcpb` the same way you [installed it](#claude-desktop-chat). Then fully quit and reopen Claude Desktop, and start a new chat. |
+Start a **new** Claude Code session. Sessions that were already open keep running the old server. There's no need to re-register it, since its path hasn't changed.
 
 #### 4. Check it worked
 
-Ask Claude to *"call the aseprite status tool"*. It should report `"mode": "live"` with Aseprite open. If anything misbehaves after an update, see [Troubleshooting](#troubleshooting).
+Ask Claude to *"call the aseprite status tool"*. It should report `"aseprite_found": true`. If anything misbehaves after an update, see [Troubleshooting](#troubleshooting).
+
+#### Updating from a version with the Claude Bridge extension
+
+Earlier versions also installed a **Claude Bridge** extension into Aseprite. It's no longer used, and `npm run setup` warns you if it's still there. To remove it, in Aseprite go to **Edit › Preferences › Extensions**, select **Claude Bridge**, and click **Uninstall**.
 
 ### Uninstalling
 
-1. Remove the server from Claude Code with `claude mcp remove --scope user aseprite`, or uninstall the extension in Claude Desktop's settings.
-2. In Aseprite, go to **Edit › Preferences › Extensions**, select **Claude Bridge**, and click **Uninstall**.
+Remove the server from Claude Code:
+
+```bash
+claude mcp remove --scope user aseprite
+```
+
+Then delete your clone of the repository.
 
 ### Platform notes
 
@@ -191,27 +140,18 @@ Ask Claude to *"call the aseprite status tool"*. It should report `"mode": "live
 
 Anywhere else, set `ASEPRITE_PATH`.
 
-**Aseprite settings folder** (where the extension is installed):
-
-| OS | Folder |
-|---|---|
-| Windows | `%APPDATA%\Aseprite` |
-| macOS | `~/Library/Application Support/Aseprite` |
-| Linux | `~/.config/aseprite` |
-
-**Steam edition.** Headless mode runs `Aseprite.exe -b` directly. Steam doesn't need to be running.
+**Steam edition.** The server runs `Aseprite.exe -b` directly. Steam doesn't need to be running.
 
 ---
 
 ## Configuration
 
-Set these as environment variables on the MCP server. In Claude Code, pass them with `claude mcp add -e KEY=value …`. In Claude Desktop, use the extension's settings.
+Set these as environment variables on the MCP server. Pass them with `claude mcp add -e KEY=value …`, or in the `"env"` field of the server's entry in `~/.claude.json`.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ASEPRITE_PATH` | auto-detect | Aseprite executable, used for headless mode and palette presets |
+| `ASEPRITE_PATH` | auto-detect | Aseprite executable; runs every command and supplies palette presets |
 | `ASEPRITE_MCP_WORKDIR` | `~/Documents/Aseprite Claude` | Where new and exported files go; relative paths resolve here |
-| `ASEPRITE_MCP_PORT` | `47823` | Bridge port; must match the port in Aseprite's **File › Claude Bridge › Status…** |
 | `ASEPRITE_MCP_ALLOW_LUA` | off | Set to `1` to expose the `run_lua` escape hatch (arbitrary Lua inside Aseprite) |
 
 ---
@@ -221,17 +161,30 @@ Set these as environment variables on the MCP server. In Claude Code, pass them 
 | Group | Tools |
 |---|---|
 | Session | `status` |
-| Document | `new_sprite`, `open_sprite`, `save_sprite`, `export_image`, `resize_sprite`, `canvas_size`, `crop` |
+| Document | `new_sprite`, `open_sprite`, `show_in_aseprite`, `save_sprite`, `export_image`, `resize_sprite`, `canvas_size`, `crop` |
 | Inspect | `render_preview` (upscaled PNG with optional grid), `read_pixels` (char grid + legend), `analyze` (stray pixels, color count, off-palette colors…) |
 | Draw | `draw_pixel_map` (main tool), `draw_pixels`, `draw_line`, `draw_rect`, `draw_ellipse`, `fill`, `erase`, `replace_color`, `outline`, `draw_gradient` (Bayer-dithered, palette-safe) |
 | Transform | `flip`, `rotate`, `shift`, `mirror`, `copy_region` |
 | Layers | `list_layers`, `add_layer`, `update_layer`, `delete_layer`, `duplicate_layer`, `merge_down`, `flatten` |
 | Palette | `get_palette`, `set_palette`, `add_palette_colors`, `list_palette_presets` (all of Aseprite's bundled palettes), `set_color_mode` |
 | Selection | `select` (rect / all / none / color / content); drawing is clipped to the selection |
-| History | `undo`, `redo` (live mode only) |
-| Power | `batch` (many ops, one undo step, all-or-nothing), `run_lua` (opt-in) |
+| Power | `batch` (many ops in one call, all-or-nothing), `run_lua` (opt-in) |
 
 Every edit tool accepts `preview: true` to return an image of the result.
+
+There is no undo: each call is saved to the file straight away. Ask Claude to `save_sprite` a copy before big changes if you want to be able to go back.
+
+### `show_in_aseprite`
+
+Opens a file in the Aseprite app so you can see it. It's what Claude uses when you say *"show me this in Aseprite"*. Without a path, it shows the file Claude is working on.
+
+| Platform | What happens |
+|---|---|
+| Windows | `.aseprite`/`.ase` files open through Windows' file association, which Aseprite registers. If Aseprite is already running, the file opens as a **new tab in that window**; otherwise Aseprite starts. PNGs, or a missing association, start a new Aseprite window instead. |
+| macOS | `open -a Aseprite`, which hands the file to the running app (a new tab) or starts Aseprite. Not yet tested on a Mac. |
+| Linux | Starts a new Aseprite window with the file. |
+
+If the file is already open in Aseprite, Aseprite keeps showing the copy it loaded earlier. Close that tab and ask again to see Claude's latest changes.
 
 The server also provides:
 - a **`pixel_art_asset`** prompt
@@ -264,70 +217,54 @@ The server also provides:
 npm run build            # compile TypeScript → dist/
 npm test                 # build + unit tests + headless end-to-end tests (needs Aseprite, ~30s)
 npm run test:unit        # unit tests only (no Aseprite needed)
-npm run package          # build + .aseprite-extension + .mcpb
-npm run install:extension  # copy lua/ into Aseprite's extensions folder (restart Aseprite after)
 npm run inspect          # MCP Inspector, to call tools by hand
-node tests/live/live-e2e.mjs        # live check: run, then open Aseprite (close other Claude sessions first)
-node tests/live/sample-potion.mjs   # draws the sample potion through the connector
 ```
 
 | Path | Contents |
 |---|---|
 | `src/` | MCP server: config, tool definitions, preview rendering, prompts |
-| `src/bridge/` | Transports: `live.ts` (WebSocket), `headless.ts` (batch mode), `router.ts` |
-| `lua/core/` | Shared Lua command core used by both modes (`handlers/*.lua`) |
-| `lua/extension/` | The Aseprite extension (`main.lua`, `package.json`) |
+| `src/bridge/` | `headless.ts` (runs Aseprite in batch mode), `router.ts` (tracks the working file) |
+| `lua/core/` | Lua command core (`handlers/*.lua`) |
 | `lua/headless.lua` | Batch-mode runner |
-| `scripts/` | Packaging, extension install and setup |
-| `tests/` | Unit tests, headless end-to-end tests, live checks |
+| `scripts/` | Setup |
+| `tests/` | Unit tests and headless end-to-end tests |
 
-After changing anything in `lua/`:
-1. Run `npm run install:extension`.
-2. Restart Aseprite.
+Changes in `lua/` take effect on the next tool call; no rebuild is needed.
 
-### Protocol
+### How a command runs
 
-The extension is a WebSocket **client**, because Aseprite's Lua API only offers a client.
+1. The server writes a request file: `{ "file", "ops": [{ "cmd", "params" }], "allow_lua" }`.
+2. It runs `Aseprite -b --script-param request=… --script-param response=… --script lua/headless.lua`.
+3. The script opens the file, runs each op, saves the file if anything changed, and writes a response: `{ "results": [{ "ok": true, "result" } | { "ok": false, "error": { "code", "message" } }], "file", "saved" }`.
 
-| From | Message |
-|---|---|
-| Lua → server | `{"type":"hello","bridge_version","aseprite_version","api_version"}` |
-| Server → Lua | `{"type":"welcome","allow_lua","server_version"}` |
-| Server → Lua (request) | `{"id","cmd","params"}` |
-| Lua → server (reply) | `{"id","ok":true,"result"}` or `{"id","ok":false,"error":{"code","message"}}` |
-
-Mutating commands run inside `app.transaction`, so a failed command rolls back everything it changed.
+Mutating commands run inside `app.transaction`, so a failed command rolls back everything it changed, and the file isn't saved.
 
 ### Security
 
-- The bridge listens on `127.0.0.1` only.
-- It rejects handshakes from web pages: browsers always send an `http(s)://` or `null` Origin, while Aseprite's client sends `ws://…`.
+- The server only talks to Claude Code over stdio; it opens no network ports.
 - `run_lua` is off unless enabled.
 
 ---
 
 ## Troubleshooting
 
-- **`status` says headless while Aseprite is open.**
-  - Open **File › Claude Bridge › Status…** in Aseprite and check that the port matches.
-  - Only one Claude app can own the port at a time. A second one (e.g. Claude Desktop while Claude Code is running) falls back to headless, and `status` explains why.
-- **A Claude Desktop chat says it has no Aseprite tools.**
-  - Check **Settings › Desktop app › Manage** (next to Extensions). If **Aseprite** isn't listed, the `.mcpb` was never installed; follow the [Claude Desktop steps](#claude-desktop-chat).
-  - Fully quit and reopen Claude Desktop, then start a **new** chat.
-  - Registering the server for Claude Code does not install it in Claude Desktop.
-- **The Aseprite extension is installed in Claude Desktop but fails to start.** Its status and logs are in the **Local MCP servers** section of the Extensions page (older versions: **Settings › Developer**). Turning on debug logging in Claude Desktop's settings adds more detail.
-- **The File › Claude Bridge menu is missing.**
-  - Check that the extension is listed and enabled in **Edit › Preferences › Extensions**.
-  - Restart Aseprite after installing.
-- **A tool call times out.** A dialog in Aseprite (usually the Security prompt) is probably waiting for you.
-- **"Aseprite executable was not found".** Set `ASEPRITE_PATH`, or open Aseprite with the extension so live mode is used.
-- **Selections in headless mode.** Aseprite doesn't save selections in `.aseprite` files, so headless mode keeps them in a sprite property between calls.
+- **"Aseprite executable was not found".** Set `ASEPRITE_PATH` to the Aseprite executable.
+- **Claude's changes don't show in Aseprite.** Aseprite doesn't reload files changed on disk. Close the file's tab in Aseprite, then ask Claude to show it again.
+- **"Show me this in Aseprite" opens a second Aseprite window** (Windows). The tab-in-the-running-window behavior relies on the `.aseprite` file association that Aseprite registers. If double-clicking a `.aseprite` file in Explorer also opens a second window, the association is missing or was replaced by another program, and the connector falls back to starting a new window.
+- **A tool call times out.** Each call starts Aseprite in the background; on a slow machine or a very large sprite this can take a while. The limit is 2 minutes per call.
+- **Selections between calls.** Aseprite doesn't save selections in `.aseprite` files, so the connector keeps them in a sprite property between calls.
 
 ## Upcoming features
 
 - **Stylization commands.** Tools that apply a pixel-art style to a sprite in one step.
-- **One connector for Claude Desktop and Claude Code.** A single install that works in both apps, instead of setting each one up separately.
-- **Auto-update the open Aseprite file.** Changes Claude makes to a file update automatically in the Aseprite window that has it open.
+- **Auto-update the open Aseprite file.** Changes Claude makes to a file update automatically in the Aseprite window that has it open. For now, close the file's tab and ask Claude to show it again.
+
+  Aseprite can't be told from outside to reload a file: it doesn't watch files on disk, and its Windows "open" handler can't close or reload. The planned approach is a small **optional** Aseprite extension:
+  1. After saving a file, the connector writes a "reload this file" note to a folder.
+  2. The extension checks that folder about once a second.
+  3. If the file is open and its tab has **no unsaved changes**, the extension closes and reopens it in place. Tabs with unsaved changes are left alone, so the user's work is never discarded.
+
+  Without the extension, everything keeps working as it does today. Simulating keystrokes (Ctrl+W, then reopen) was ruled out: it's fragile and can discard unsaved work.
 
 ## License
 

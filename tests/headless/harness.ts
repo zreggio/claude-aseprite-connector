@@ -16,7 +16,7 @@ export interface Harness {
   close: () => Promise<void>;
 }
 
-/** Start the built MCP server (dist/index.js) on an unused port so it runs headless. */
+/** Start the built MCP server (dist/index.js) with its own working folder. */
 export async function startServer(name: string, extraEnv: Record<string, string> = {}): Promise<Harness> {
   const workdir = path.join(ROOT, "tests", ".tmp", name);
   fs.rmSync(workdir, { recursive: true, force: true });
@@ -26,7 +26,6 @@ export async function startServer(name: string, extraEnv: Record<string, string>
     args: [path.join(ROOT, "dist", "index.js")],
     env: {
       ...(process.env as Record<string, string>),
-      ASEPRITE_MCP_PORT: String(48000 + Math.floor(Math.random() * 1000)),
       ASEPRITE_MCP_WORKDIR: workdir,
       ...extraEnv,
     },

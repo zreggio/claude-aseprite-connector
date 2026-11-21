@@ -1,5 +1,4 @@
--- Claude Bridge core loader. Shared by the Aseprite extension (live mode)
--- and lua/headless.lua (batch mode).
+-- Claude Bridge core loader, used by lua/headless.lua (batch mode).
 --
 -- Usage: local core = dofile(joinPath(root, "core", "init.lua"))(root)
 --        core.dispatch(cmd, params, ctx) -> { ok = true, result = ... } | { ok = false, error = {...} }
@@ -16,7 +15,7 @@ return function(root)
   local U = load("util.lua")(json)
   local dispatcher = load("dispatcher.lua")(json, U)
 
-  for _, name in ipairs({ "document", "inspect", "draw", "transform", "layers", "palette", "selection", "history", "power" }) do
+  for _, name in ipairs({ "document", "inspect", "draw", "transform", "layers", "palette", "selection", "power" }) do
     load(app.fs.joinPath("handlers", name .. ".lua"))(dispatcher.def, U, json, dispatcher)
   end
 

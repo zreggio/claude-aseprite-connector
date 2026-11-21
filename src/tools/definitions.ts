@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { BridgeError } from "../bridge/types.js";
+import { showInAseprite } from "../launch.js";
 import { listPalettePresets, presetColors } from "../palettes.js";
 import { renderPreview } from "../render/preview.js";
 import {
@@ -77,33 +78,22 @@ export function buildTools(cfg: { allowLua: boolean }): ToolDef[] {
       kind: "read",
       batchable: false,
       description:
-        "Show how the connector reaches Aseprite (live = editing the open Aseprite window; headless = editing .aseprite files in the background), the open sprites, the active sprite/layer, and the working folder. Call this first.",
+        "Show whether Aseprite was found, the working .aseprite file, the active sprite/layer, and the working folder. Call this first.",
       shape: {},
       run: async (_args, ctx) => {
         const { router, cfg } = ctx;
         const node = {
-          mode: router.mode,
-          live: {
-            connected: router.live.connected,
-            listening: router.live.listening,
-            port: cfg.port,
-            error: router.live.listenError,
-            aseprite: router.live.info,
-          },
-          headless: {
-            available: router.headless.available,
-            aseprite_path: cfg.asepritePath ?? null,
-            working_file: router.headless.currentFile ?? null,
-          },
+          aseprite_found: router.headless.available,
+          aseprite_path: cfg.asepritePath ?? null,
+          working_file: router.headless.currentFile ?? null,
           workdir: cfg.workdir,
           run_lua_enabled: cfg.allowLua,
-          hint:
-            router.mode === "live"
-              ? "Edits appear live in Aseprite; each tool call is one undo step."
-              : "Aseprite isn't connected. Edits are applied to the working .aseprite file on disk. To edit live, open Aseprite with the Claude Bridge extension installed.",
+          hint: router.headless.available
+            ? "Edits are saved to the working .aseprite file after each call. Reopen the file in Aseprite to see the changes."
+            : "Aseprite wasn't found. Set ASEPRITE_PATH to the Aseprite executable.",
         };
         let aseprite: unknown = null;
-        if (router.mode === "live" || router.headless.available) {
+        if (router.headless.available) {
           try {
             aseprite = await router.call("status", {});
           } catch (e) {
@@ -121,19 +111,19 @@ export function buildTools(cfg: { allowLua: boolean }): ToolDef[] {
       kind: "file",
       batchable: false,
       description:
-        "Create a new single-frame sprite (and make it active). Pixel-art assets are usually small: 16x16, 32x32, 48x48, 64x64. In indexed mode palette index 0 is reserved for transparency and your palette starts at index 1. In headless mode the file is saved immediately (to `path`, or a timestamped file in the working folder).",
+        "Create a new single-frame sprite (and make it active). Pixel-art assets are usually small: 16x16, 32x32, 48x48, 64x64. In indexed mode palette index 0 is reserved for transparency and your palette starts at index 1. The file is saved immediately (to `path`, or a timestamped file in the working folder).",
       shape: {
         width: z.number().int().min(1).max(1024).describe("Canvas width in pixels."),
         height: z.number().int().min(1).max(1024).describe("Canvas height in pixels."),
         color_mode: z.enum(["rgb", "indexed", "gray"]).optional().describe("Default 'rgb'."),
         background: z.string().optional().describe("Opaque background color (creates a Background layer). Omit for transparent (best for game assets)."),
         layer_name: z.string().optional().describe("Name of the first drawing layer (default 'Layer 1')."),
-        path: z.string().optional().describe("Where to save the .aseprite file (relative paths go to the working folder). Optional in live mode."),
+        path: z.string().optional().describe("Where to save the .aseprite file (relative paths go to the working folder)."),
         ...paletteFields,
       },
       prepare: (a, ctx) => {
         let p = resolvePath(ctx.cfg, a.path, ".aseprite");
-        if (!p && ctx.router.mode === "headless") p = path.join(ctx.cfg.workdir, `${timestampName()}.aseprite`);
+        if (!p) p = path.join(ctx.cfg.workdir, `${timestampName()}.aseprite`);
         return stripUndefined({
           width: a.width,
           height: a.height,
@@ -156,6 +146,31 @@ export function buildTools(cfg: { allowLua: boolean }): ToolDef[] {
         const p = resolvePath(ctx.cfg, a.path)!;
         if (!fs.existsSync(p)) throw new BridgeError("file_not_found", `File not found: ${p}`);
         return { path: p };
+      },
+    },
+    {
+      name: "show_in_aseprite",
+      title: "Show in Aseprite",
+      kind: "file",
+      batchable: false,
+      description:
+        "Open a file in the Aseprite app so the user can see it, e.g. when they say 'show me this in Aseprite'. Defaults to the working file. On Windows and macOS it opens as a new tab in an Aseprite window that's already running, or starts Aseprite. If the file was already open in Aseprite, Aseprite keeps showing its earlier copy: tell the user to close that tab first to see the latest changes.",
+      shape: { path: z.string().optional().describe("File to show (relative → working folder). Defaults to the working file.") },
+      run: async (a, ctx) => {
+        const file = resolvePath(ctx.cfg, a.path) ?? ctx.router.headless.currentFile;
+        if (!file) throw new BridgeError("no_sprite", "No file to show. Pass `path`, or create or open a sprite first.");
+        if (!fs.existsSync(file)) throw new BridgeError("file_not_found", `File not found: ${file}`);
+        const method = await showInAseprite(file, ctx.cfg.asepritePath);
+        return [
+          json({
+            shown: file,
+            method,
+            note:
+              method === "new_process"
+                ? "Started a new Aseprite window with the file."
+                : "Sent to Aseprite: it opens in the running window (or starts Aseprite). If the file was already open there, Aseprite shows its earlier copy until that tab is closed and the file reopened.",
+          }),
+        ];
       },
     },
     {
@@ -566,7 +581,7 @@ export function buildTools(cfg: { allowLua: boolean }): ToolDef[] {
       title: "Delete layer",
       kind: "write",
       destructive: true,
-      description: "Delete a layer or group (undoable in live mode).",
+      description: "Delete a layer or group.",
       shape: { sprite, layer: z.string().describe("Layer to delete.") },
     },
     {
@@ -672,24 +687,6 @@ export function buildTools(cfg: { allowLua: boolean }): ToolDef[] {
         layer: z.string().optional().describe("For color/content: sample this layer instead of the flattened image."),
       },
     },
-
-    // ---------------- History ----------------
-    {
-      name: "undo",
-      title: "Undo",
-      kind: "write",
-      batchable: false,
-      description: "Undo the last N operations in Aseprite (live mode only). Each tool call / batch is one step.",
-      shape: { sprite, steps: z.number().int().min(1).max(100).optional(), preview },
-    },
-    {
-      name: "redo",
-      title: "Redo",
-      kind: "write",
-      batchable: false,
-      description: "Redo N undone operations (live mode only).",
-      shape: { sprite, steps: z.number().int().min(1).max(100).optional(), preview },
-    },
   ];
 
   if (cfg.allowLua) {
@@ -699,7 +696,7 @@ export function buildTools(cfg: { allowLua: boolean }): ToolDef[] {
       kind: "write",
       destructive: true,
       description:
-        "Escape hatch: run Lua inside Aseprite with the full scripting API (app, Sprite, Image, …) in one undo step. `sprite` is the active sprite, `print()` output is returned along with the chunk's return value. Prefer the dedicated tools when they fit.",
+        "Escape hatch: run Lua inside Aseprite with the full scripting API (app, Sprite, Image, …) in one transaction. `sprite` is the active sprite, `print()` output is returned along with the chunk's return value. Prefer the dedicated tools when they fit.",
       shape: { sprite, code: z.string().min(1).describe("Lua source."), preview },
     });
   }

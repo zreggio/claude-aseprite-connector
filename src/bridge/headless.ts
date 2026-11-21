@@ -43,7 +43,7 @@ export class HeadlessBridge {
     if (!this.available) {
       throw new BridgeError(
         "aseprite_not_found",
-        "Aseprite is not connected and its executable was not found for headless mode. Open Aseprite with the Claude Bridge extension, or set ASEPRITE_PATH.",
+        "The Aseprite executable was not found. Set ASEPRITE_PATH to it.",
       );
     }
     await fs.mkdir(this.tmpDir, { recursive: true });

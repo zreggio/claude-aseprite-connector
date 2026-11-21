@@ -24,9 +24,3 @@ export function unwrap(r: LuaResult): any {
   if (r.ok) return r.result;
   throw new BridgeError(r.error.code, r.error.message, r.error.details);
 }
-
-export interface HelloInfo {
-  bridge_version?: string;
-  aseprite_version?: string;
-  api_version?: number;
-}

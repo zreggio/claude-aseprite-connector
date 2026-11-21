@@ -12,7 +12,6 @@ return function(def, U, json, D)
     end
     local fg = app.fgColor
     return {
-      mode = ctx.mode,
       bridge_version = D.VERSION,
       aseprite_version = tostring(app.version),
       api_version = app.apiVersion,

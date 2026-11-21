@@ -4,23 +4,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface Config {
-  /** Path to the Aseprite executable (used for headless mode and palette presets). */
+  /** Path to the Aseprite executable (runs every command and supplies palette presets). */
   asepritePath: string | undefined;
-  /** Port the live bridge WebSocket server listens on (127.0.0.1 only). */
-  port: number;
   /** Whether the run_lua tool is exposed. */
   allowLua: boolean;
   /** Default folder for new/saved/exported files; relative paths resolve here. */
   workdir: string;
   /** Folder containing headless.lua and core/. */
   luaDir: string;
-  /** Timeout for a single live request. */
-  liveTimeoutMs: number;
   /** Timeout for one headless Aseprite process. */
   headlessTimeoutMs: number;
 }
-
-export const DEFAULT_PORT = 47823;
 
 function candidateAsepritePaths(): string[] {
   const list: string[] = [];
@@ -57,7 +51,7 @@ function truthy(v: string | undefined): boolean {
   return v !== undefined && /^(1|true|yes|on)$/i.test(v.trim());
 }
 
-/** Locate the lua/ folder: next to dist/ in the repo, or next to server/ in the .mcpb bundle. */
+/** Locate the lua/ folder: next to dist/ in the repo. */
 function findLuaDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [path.resolve(here, "..", "lua"), path.resolve(here, "lua"), path.resolve(here, "..", "..", "lua")];
@@ -65,17 +59,14 @@ function findLuaDir(): string {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const port = Number.parseInt(env.ASEPRITE_MCP_PORT ?? "", 10);
   const workdir = env.ASEPRITE_MCP_WORKDIR?.trim()
     ? path.resolve(env.ASEPRITE_MCP_WORKDIR.trim())
     : path.join(os.homedir(), "Documents", "Aseprite Claude");
   return {
     asepritePath: findAseprite(env.ASEPRITE_PATH),
-    port: Number.isFinite(port) && port > 0 ? port : DEFAULT_PORT,
     allowLua: truthy(env.ASEPRITE_MCP_ALLOW_LUA),
     workdir,
     luaDir: findLuaDir(),
-    liveTimeoutMs: 60_000,
     headlessTimeoutMs: 120_000,
   };
 }

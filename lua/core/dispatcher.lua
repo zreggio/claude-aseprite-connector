@@ -56,7 +56,6 @@ return function(json, U)
       if type(e) == "table" then return e end
       return debug.traceback(tostring(e), 2)
     end)
-    if ctx.live then pcall(app.refresh) end
     if ok then
       if res == nil then res = json.object({}) end
       return { ok = true, result = res }

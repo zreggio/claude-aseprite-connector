@@ -25,10 +25,9 @@ describe.skipIf(!hasAseprite)("headless tools (real Aseprite)", () => {
     expect(names).not.toContain("run_lua");
   });
 
-  it("reports headless mode and refuses work without a file", async () => {
+  it("finds Aseprite and refuses work without a file", async () => {
     const s = await h.call("status");
-    expect(s.mode).toBe("headless");
-    expect(s.headless.available).toBe(true);
+    expect(s.aseprite_found).toBe(true);
     const r: any = await h.callRaw("draw_pixels", { pixels: [{ x: 0, y: 0, color: R }] });
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toMatch(/no_sprite/);
@@ -246,16 +245,11 @@ describe.skipIf(!hasAseprite)("headless tools (real Aseprite)", () => {
   it("re-opens files and tracks the working file", async () => {
     await h.call("open_sprite", { path: "test.aseprite" });
     const s = await h.call("status");
-    expect(s.headless.working_file).toMatch(/test\.aseprite$/);
+    expect(s.working_file).toMatch(/test\.aseprite$/);
     expect(s.aseprite.active_sprite.width).toBeGreaterThan(4);
     const saved = await h.call("save_sprite", { path: "copy.aseprite" });
     expect(fs.existsSync(path.join(h.workdir, "copy.aseprite"))).toBe(true);
     expect(saved.saved).toMatch(/copy\.aseprite$/);
-  });
-
-  it("explains that undo is live-only", async () => {
-    const r: any = await h.callRaw("undo", {});
-    expect(r.content[0].text).toMatch(/not_available/);
   });
 });
 

@@ -1,8 +1,8 @@
-// One-step setup after `npm run package` (run via `npm run setup`):
+// One-step setup after `npm run build` (run via `npm run setup`):
 //  1. checks Node and finds Aseprite
-//  2. installs the Claude Bridge extension into Aseprite (if Aseprite has been run once)
-//  3. prints (or runs, with --claude-code) the commands that connect Claude
-import { execFileSync, spawnSync } from "node:child_process";
+//  2. warns if the old Claude Bridge extension is still installed
+//  3. prints (or runs, with --claude-code) the command that connects Claude Code
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -26,7 +26,7 @@ ok(`Node ${process.versions.node}`);
 
 const serverEntry = path.join(root, "dist", "index.js");
 if (!fs.existsSync(serverEntry)) {
-  console.error("  ✖ dist/index.js is missing. Run `npm run setup` (or `npm run package` first).");
+  console.error("  ✖ dist/index.js is missing. Run `npm run setup` (or `npm run build` first).");
   process.exit(1);
 }
 ok(`MCP server built: ${fwd(serverEntry)}`);
@@ -34,29 +34,21 @@ ok(`MCP server built: ${fwd(serverEntry)}`);
 const { findAseprite } = await import(pathToFileURL(path.join(root, "dist", "config.js")).href);
 const aseprite = findAseprite(process.env.ASEPRITE_PATH);
 if (aseprite) ok(`Aseprite found: ${aseprite}`);
-else warn("Aseprite not found automatically. Set ASEPRITE_PATH to its executable (needed for headless mode and palette presets).");
+else warn("Aseprite not found automatically. Set ASEPRITE_PATH to its executable (the connector runs it for every command).");
 
-// 2. Aseprite extension --------------------------------------------------------
+// 2. Leftover extension from older versions ----------------------------------
 function asepriteConfigDir() {
   if (process.platform === "win32") return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "Aseprite");
   if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "Aseprite");
   return path.join(os.homedir(), ".config", "aseprite");
 }
-const cfgDir = asepriteConfigDir();
-const extFile = path.join(root, "dist", "claude-bridge.aseprite-extension");
-if (args.has("--skip-extension")) {
-  warn("Skipped installing the Aseprite extension (--skip-extension).");
-} else if (fs.existsSync(cfgDir)) {
-  execFileSync(process.execPath, [path.join(root, "scripts", "install-extension.mjs")], { stdio: "pipe" });
-  ok(`Claude Bridge extension installed in ${fwd(path.join(cfgDir, "extensions", "claude-bridge"))}`);
-  console.log("    Restart Aseprite to load it (File > Claude Bridge appears in the menu).");
-} else {
-  warn(`Aseprite's settings folder doesn't exist yet (${cfgDir}).`);
-  console.log("    Launch Aseprite once, then either run `npm run install:extension`,");
-  console.log(`    or double-click ${fwd(extFile)}.`);
+const oldExt = path.join(asepriteConfigDir(), "extensions", "claude-bridge");
+if (fs.existsSync(oldExt)) {
+  warn("The old Claude Bridge extension is still installed in Aseprite. It's no longer used:");
+  console.log("    in Aseprite, go to Edit > Preferences > Extensions, select Claude Bridge and click Uninstall.");
 }
 
-// 3. Connect Claude -------------------------------------------------------------
+// 3. Connect Claude Code --------------------------------------------------------
 const nodeCmd = "node";
 const entry = fwd(serverEntry);
 const hasClaudeCli = spawnSync(process.platform === "win32" ? "where" : "which", ["claude"], { stdio: "ignore" }).status === 0;
@@ -75,11 +67,4 @@ if (args.has("--claude-code") && hasClaudeCli) {
   console.log(`    "aseprite": { "type": "stdio", "command": "${nodeCmd}", "args": ["${entry}"] }`);
 }
 
-console.log("\n  Claude Desktop (chat) — separate from Claude Code:");
-console.log("    1. Settings > Desktop app > Manage (next to Extensions)   [older versions: Settings > Extensions]");
-console.log("    2. Advanced settings > Extension Developer > Install Extension...");
-console.log(`    3. Select ${fwd(path.join(root, "dist", "aseprite.mcpb"))} and click Install`);
-console.log("    4. Fully quit Claude Desktop (tray / menu bar), reopen it, and start a NEW chat");
-console.log("    5. Check: + button in the chat box > Connectors > Aseprite");
-
-console.log("\nThen open Aseprite and ask Claude: \"Call the aseprite status tool\" — it should report mode \"live\".\n");
+console.log('\nThen ask Claude: "Call the aseprite status tool". It should report "aseprite_found": true.\n');
