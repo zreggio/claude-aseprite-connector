@@ -131,12 +131,48 @@ Only `core/handlers/document.lua` writes files: `new_sprite` with a path, `save_
 
 ### Updating
 
+New features and fixes are added to the `main` branch on GitHub. To get them, pull the changes into your clone, rebuild, then refresh each part that uses the connector.
+
+#### 1. Check for updates
+
+In your clone (the `claude-aseprite-connector` folder), run:
+
+```bash
+git fetch
+git log --oneline HEAD..origin/main
+```
+
+If nothing is listed, you're up to date. Otherwise, each line is a change you don't have yet.
+
+#### 2. Pull and rebuild
+
+Close Aseprite first, so the extension files aren't in use. Then run:
+
 ```bash
 git pull
 npm install
 npm run setup
 ```
-Then restart Aseprite and your Claude app.
+
+- `git pull` downloads the latest code.
+- `npm install` picks up any new or updated dependencies.
+- `npm run setup` rebuilds the server, `dist/claude-bridge.aseprite-extension` and `dist/aseprite.mcpb`, and reinstalls the extension into Aseprite.
+
+**If `git pull` refuses** because you have local changes, either set them aside with `git stash` (bring them back later with `git stash pop`) or discard them with `git checkout -- .`. Then run `git pull` again.
+
+#### 3. Apply the update
+
+Update each part you use:
+
+| Part | What to do |
+|---|---|
+| **Aseprite extension** | Reopen Aseprite. `npm run setup` already reinstalled it. If it says the extension wasn't installed, double-click `dist/claude-bridge.aseprite-extension`. |
+| **Claude Code** | Start a **new** session. No need to re-register, since the server path hasn't changed. |
+| **Claude Desktop (chat)** | Reinstall `dist/aseprite.mcpb` the same way you [installed it](#claude-desktop-chat). Then fully quit and reopen Claude Desktop, and start a new chat. |
+
+#### 4. Check it worked
+
+Ask Claude to *"call the aseprite status tool"*. It should report `"mode": "live"` with Aseprite open. If anything misbehaves after an update, see [Troubleshooting](#troubleshooting).
 
 ### Uninstalling
 
